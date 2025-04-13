@@ -1,10 +1,119 @@
 // 临时主文件，用于展示加载界面
 // 在完整项目中，这些将从各个模块导入
-const initRenderer = () => ({ scene: {}, render: () => {}, handleResize: () => {} });
+
+// 初始化渲染器
+const initRenderer = (canvas) => {
+  // 创建场景
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87CEEB); // 天空蓝色背景
+
+  // 创建相机
+  const camera = new THREE.PerspectiveCamera(
+    75, // 视野角度
+    window.innerWidth / window.innerHeight, // 宽高比
+    0.1, // 近平面
+    1000 // 远平面
+  );
+  camera.position.set(0, 5, 10);
+
+  // 创建WebGL渲染器
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: false // 关闭抗锯齿以增强像素效果
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(1); // 固定像素比为1，增强像素效果
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  // 创建轨道控制器（临时，后面会替换为自定义控制器）
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+
+  // 添加环境光
+  const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+  scene.add(ambientLight);
+
+  // 添加定向光（模拟太阳）
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+  directionalLight.position.set(50, 200, 100);
+  directionalLight.castShadow = true;
+  scene.add(directionalLight);
+
+  // 添加半球光（模拟环境反射）
+  const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+  scene.add(hemisphereLight);
+
+  // 创建一个简单的地面
+  const groundGeometry = new THREE.PlaneGeometry(100, 100);
+  const groundMaterial = new THREE.MeshStandardMaterial({
+    color: 0x7CFC00,
+    roughness: 0.8,
+    metalness: 0.2
+  });
+  const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // 创建一些石柱
+  for (let i = 0; i < 20; i++) {
+    const height = 2 + Math.random() * 8;
+    const geometry = new THREE.CylinderGeometry(0.5, 0.7, height, 6);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x808080,
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    const pillar = new THREE.Mesh(geometry, material);
+    pillar.position.set(
+      (Math.random() - 0.5) * 50,
+      height / 2,
+      (Math.random() - 0.5) * 50
+    );
+    pillar.castShadow = true;
+    pillar.receiveShadow = true;
+    scene.add(pillar);
+  }
+
+  // 处理窗口大小变化
+  function handleResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  // 渲染函数
+  function render() {
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  // 返回渲染器对象
+  return {
+    scene,
+    camera,
+    renderer,
+    controls,
+    handleResize,
+    render
+  };
+};
+
+// 初始化输入系统
 const initInputSystem = () => ({ update: () => {} });
+
+// 初始化物理系统
 const initPhysics = () => ({ update: () => {} });
+
+// 初始化世界
 const initWorld = () => ({ update: () => {} });
+
+// 初始化UI
 const initUI = () => ({ update: () => {} });
+
+// 初始化网络客户端
 const initNetworkClient = () => ({ sendPlayerUpdate: () => {} });
 
 // 导入存档菜单
