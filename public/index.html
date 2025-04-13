@@ -3,118 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>开放世界建设者</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <title>Minecraft风格沙盒游戏</title>
+    <link rel="stylesheet" href="css/minecraft-style.css">
 </head>
 <body>
-    <!-- 游戏容器 -->
-    <div id="game-container">
-        <canvas id="game-canvas"></canvas>
+    <!-- 游戏画布 -->
+    <canvas id="game-canvas"></canvas>
 
-        <!-- UI覆盖层 -->
-        <div id="ui-overlay" class="hidden">
-            <!-- 顶部菜单 -->
-            <div id="top-menu">
-                <div id="player-info">
-                    <span id="player-name">玩家</span>
-                    <span id="player-resources">资源: 100</span>
+    <!-- 加载屏幕 -->
+    <div id="loading-screen">
+        <div class="loading-container">
+            <h1>Minecraft风格沙盒游戏</h1>
+            <div class="loading-bar">
+                <div class="progress"></div>
+            </div>
+            <p class="loading-text">正在加载游戏资源...</p>
+        </div>
+    </div>
+
+    <!-- 主菜单 -->
+    <div id="main-menu" class="game-menu" style="display: none;">
+        <h1 class="menu-title">Minecraft风格沙盒游戏</h1>
+        <div class="menu-buttons">
+            <button class="pixel-button" id="start-game">开始游戏</button>
+            <button class="pixel-button" id="options">选项</button>
+            <button class="pixel-button" id="about">关于</button>
+        </div>
+    </div>
+
+    <!-- 选项菜单 -->
+    <div id="options-menu" class="game-menu" style="display: none;">
+        <h1 class="menu-title">游戏选项</h1>
+        <div class="options-container">
+            <div class="option-group">
+                <h2>图形设置</h2>
+                <div class="option-item">
+                    <label for="render-distance">渲染距离</label>
+                    <select id="render-distance">
+                        <option value="2">近</option>
+                        <option value="5" selected>中</option>
+                        <option value="8">远</option>
+                        <option value="12">超远</option>
+                    </select>
                 </div>
-                <div id="game-controls">
-                    <button id="build-button">建造</button>
-                    <button id="social-button">社交</button>
-                    <button id="settings-button">设置</button>
+                <div class="option-item">
+                    <label for="graphics-quality">图形质量</label>
+                    <select id="graphics-quality">
+                        <option value="low">低</option>
+                        <option value="medium" selected>中</option>
+                        <option value="high">高</option>
+                    </select>
                 </div>
             </div>
-
-            <!-- 建造菜单 -->
-            <div id="build-menu">
-                <div class="build-item" data-type="house">
-                    <img src="assets/icons/house.png" alt="房屋">
-                    <span>房屋</span>
+            <div class="option-group">
+                <h2>音频设置</h2>
+                <div class="option-item">
+                    <label for="sound-volume">音效音量</label>
+                    <input type="range" id="sound-volume" min="0" max="1" step="0.1" value="0.7">
                 </div>
-                <div class="build-item" data-type="farm">
-                    <img src="assets/icons/farm.png" alt="农场">
-                    <span>农场</span>
-                </div>
-                <div class="build-item" data-type="workshop">
-                    <img src="assets/icons/workshop.png" alt="工坊">
-                    <span>工坊</span>
-                </div>
-                <div class="build-item" data-type="ironMonster">
-                    <img src="assets/icons/placeholder.png" alt="铁怪兽">
-                    <span>铁怪兽</span>
-                </div>
-                <div class="build-item" data-type="ironFortress">
-                    <img src="assets/icons/placeholder.png" alt="铁堡垒">
-                    <span>铁堡垒</span>
-                </div>
-                <div class="build-item" data-type="racetrack">
-                    <img src="assets/icons/placeholder.png" alt="赛马场">
-                    <span>赛马场</span>
-                </div>
-            </div>
-
-            <!-- 社交菜单 -->
-            <div id="social-menu">
-                <h2>在线玩家</h2>
-                <div class="player-list">
-                    <!-- 玩家列表将通过JavaScript动态生成 -->
-                </div>
-            </div>
-
-            <!-- 设置菜单 -->
-            <div id="settings-menu">
-                <h2>游戏设置</h2>
-                <div class="settings-group">
-                    <h3>图形设置</h3>
-                    <div class="settings-item">
-                        <label for="graphics-quality">图形质量</label>
-                        <select id="graphics-quality">
-                            <option value="low">低</option>
-                            <option value="medium" selected>中</option>
-                            <option value="high">高</option>
-                        </select>
-                    </div>
-                    <div class="settings-item">
-                        <label for="pixel-size">像素大小</label>
-                        <input type="range" id="pixel-size" min="1" max="8" value="4">
-                    </div>
-                </div>
-                <div class="settings-group">
-                    <h3>音频设置</h3>
-                    <div class="settings-item">
-                        <label for="sound-volume">音效音量</label>
-                        <input type="range" id="sound-volume" min="0" max="1" step="0.1" value="0.7">
-                    </div>
-                    <div class="settings-item">
-                        <label for="music-volume">音乐音量</label>
-                        <input type="range" id="music-volume" min="0" max="1" step="0.1" value="0.5">
-                    </div>
-                </div>
-                <div class="settings-buttons">
-                    <button id="settings-save">保存</button>
-                    <button id="settings-cancel">取消</button>
+                <div class="option-item">
+                    <label for="music-volume">音乐音量</label>
+                    <input type="range" id="music-volume" min="0" max="1" step="0.1" value="0.5">
                 </div>
             </div>
         </div>
+        <div class="menu-buttons">
+            <button class="pixel-button" id="save-options">保存</button>
+            <button class="pixel-button" id="back-to-menu">返回</button>
+        </div>
+    </div>
 
-        <!-- 加载屏幕 -->
-        <div id="loading-screen">
-            <div class="loading-content">
-                <h1>开放世界建设者</h1>
-                <div class="progress-bar">
-                    <div class="progress"></div>
-                </div>
-                <p class="loading-text">正在加载游戏资源...</p>
-            </div>
+    <!-- 关于菜单 -->
+    <div id="about-menu" class="game-menu" style="display: none;">
+        <h1 class="menu-title">关于游戏</h1>
+        <div class="about-content">
+            <p>这是一个基于Three.js的Minecraft风格沙盒游戏。</p>
+            <p>使用WASD移动，空格跳跃，鼠标左键破坏方块，右键放置方块。</p>
+            <p>滚轮切换物品栏，数字键1-9直接选择物品。</p>
+            <p>按ESC键暂停游戏。</p>
+        </div>
+        <div class="menu-buttons">
+            <button class="pixel-button" id="back-from-about">返回</button>
+        </div>
+    </div>
+
+    <!-- 暂停菜单 -->
+    <div id="pause-menu" class="game-menu" style="display: none;">
+        <h1 class="menu-title">游戏暂停</h1>
+        <div class="menu-buttons">
+            <button class="pixel-button" id="resume-game">继续游戏</button>
+            <button class="pixel-button" id="options-from-pause">选项</button>
+            <button class="pixel-button" id="exit-to-menu">返回主菜单</button>
+        </div>
+    </div>
+
+    <!-- 游戏结束菜单 -->
+    <div id="game-over" class="game-menu" style="display: none;">
+        <h1 class="menu-title">游戏结束</h1>
+        <div class="game-over-stats">
+            <p>生存时间: <span id="survival-time">0</span> 秒</p>
+            <p>破坏方块: <span id="blocks-broken">0</span> 个</p>
+            <p>放置方块: <span id="blocks-placed">0</span> 个</p>
+        </div>
+        <div class="menu-buttons">
+            <button class="pixel-button" id="respawn">重生</button>
+            <button class="pixel-button" id="exit-to-menu-from-death">返回主菜单</button>
         </div>
     </div>
 
     <!-- 脚本 -->
-    <script src="js/vendor/socket.io.js"></script>
     <script src="js/vendor/three.min.js"></script>
     <script src="js/vendor/OrbitControls.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/vendor/PointerLockControls.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
