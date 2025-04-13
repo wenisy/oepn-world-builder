@@ -27,9 +27,16 @@ const initRenderer = (canvas) => {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   // 创建轨道控制器（临时，后面会替换为自定义控制器）
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
+  let controls;
+  try {
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+  } catch (error) {
+    console.error('OrbitControls 初始化失败:', error);
+    // 创建一个空的控制器对象
+    controls = { update: () => {} };
+  }
 
   // 添加环境光
   const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
