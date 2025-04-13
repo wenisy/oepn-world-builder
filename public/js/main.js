@@ -9,42 +9,295 @@ const initNetworkClient = () => ({ sendPlayerUpdate: () => {} });
 
 // 导入存档菜单
 // 在实际项目中，这将从模块导入
-const createSaveMenu = () => ({
-  show: () => {
-    // 创建存档菜单元素
-    const saveMenu = document.createElement('div');
-    saveMenu.className = 'save-menu';
-    saveMenu.innerHTML = `
-      <h2>选择世界</h2>
-      <div class="save-list">
-        <div class="save-item selected" data-id="default">
-          <div class="save-info">
-            <h3>默认世界</h3>
-            <p>一个神秘的石林世界，等待探索。</p>
-            <span class="save-date">最后游玩: ${new Date().toLocaleString()}</span>
-          </div>
-          <button class="delete-button">删除</button>
-        </div>
-      </div>
-      <div class="button-container">
-        <button class="button">创建新世界</button>
-        <button class="button primary">进入游戏</button>
-      </div>
-    `;
+const createSaveMenu = () => {
+  // 存档列表
+  let saves = [];
 
-    // 添加到文档
-    document.body.appendChild(saveMenu);
+  // 当前选中的存档ID
+  let selectedSaveId = null;
 
-    // 添加事件监听器
-    const enterButton = saveMenu.querySelector('.button.primary');
-    enterButton.addEventListener('click', () => {
-      saveMenu.remove();
-      document.getElementById('loading-screen').style.display = 'flex';
-      initGame();
+  // 创建菜单容器
+  const container = document.createElement('div');
+  container.className = 'save-menu';
+  container.style.display = 'none';
+
+  // 创建标题
+  const title = document.createElement('h2');
+  title.textContent = '选择世界';
+  container.appendChild(title);
+
+  // 创建存档列表容器
+  const saveList = document.createElement('div');
+  saveList.className = 'save-list';
+  container.appendChild(saveList);
+
+  // 创建按钮容器
+  const buttonContainer = document.createElement('div');
+  buttonContainer.className = 'button-container';
+  container.appendChild(buttonContainer);
+
+  // 创建新建存档按钮
+  const newSaveButton = document.createElement('button');
+  newSaveButton.textContent = '创建新世界';
+  newSaveButton.className = 'button';
+  newSaveButton.addEventListener('click', showCreateSaveForm);
+  buttonContainer.appendChild(newSaveButton);
+
+  // 创建进入游戏按钮
+  const enterButton = document.createElement('button');
+  enterButton.textContent = '进入游戏';
+  enterButton.className = 'button primary';
+  enterButton.disabled = true;
+  enterButton.addEventListener('click', enterSelectedSave);
+  buttonContainer.appendChild(enterButton);
+
+  // 创建新存档表单
+  const createSaveForm = document.createElement('div');
+  createSaveForm.className = 'create-save-form';
+  createSaveForm.style.display = 'none';
+  container.appendChild(createSaveForm);
+
+  // 创建表单标题
+  const formTitle = document.createElement('h3');
+  formTitle.textContent = '创建新世界';
+  createSaveForm.appendChild(formTitle);
+
+  // 创建名称输入
+  const nameLabel = document.createElement('label');
+  nameLabel.textContent = '世界名称:';
+  createSaveForm.appendChild(nameLabel);
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = '输入世界名称';
+  createSaveForm.appendChild(nameInput);
+
+  // 创建描述输入
+  const descLabel = document.createElement('label');
+  descLabel.textContent = '世界描述:';
+  createSaveForm.appendChild(descLabel);
+
+  const descInput = document.createElement('textarea');
+  descInput.placeholder = '输入世界描述';
+  createSaveForm.appendChild(descInput);
+
+  // 创建环境选择
+  const envLabel = document.createElement('label');
+  envLabel.textContent = '初始环境:';
+  createSaveForm.appendChild(envLabel);
+
+  const envSelect = document.createElement('select');
+  const environments = [
+    { value: 'stoneForest', label: '石林' },
+    { value: 'plains', label: '平原' },
+    { value: 'mountains', label: '山地' },
+    { value: 'desert', label: '沙漠' }
+  ];
+
+  environments.forEach(env => {
+    const option = document.createElement('option');
+    option.value = env.value;
+    option.textContent = env.label;
+    envSelect.appendChild(option);
+  });
+
+  createSaveForm.appendChild(envSelect);
+
+  // 创建表单按钮容器
+  const formButtonContainer = document.createElement('div');
+  formButtonContainer.className = 'button-container';
+  createSaveForm.appendChild(formButtonContainer);
+
+  // 创建取消按钮
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = '取消';
+  cancelButton.className = 'button';
+  cancelButton.addEventListener('click', hideCreateSaveForm);
+  formButtonContainer.appendChild(cancelButton);
+
+  // 创建确认按钮
+  const confirmButton = document.createElement('button');
+  confirmButton.textContent = '创建';
+  confirmButton.className = 'button primary';
+  confirmButton.addEventListener('click', createNewSave);
+  formButtonContainer.appendChild(confirmButton);
+
+  // 添加到文档
+  document.body.appendChild(container);
+
+  // 显示存档菜单
+  function show() {
+    container.style.display = 'flex';
+
+    // 请求存档列表
+    // 模拟服务器响应
+    setTimeout(() => {
+      updateSaveList([{
+        id: 'default',
+        name: '默认世界',
+        description: '一个神秘的石林世界，等待探索。',
+        lastPlayedAt: Date.now()
+      }]);
+    }, 500);
+  }
+
+  // 隐藏存档菜单
+  function hide() {
+    container.style.display = 'none';
+  }
+
+  // 更新存档列表
+  function updateSaveList(savesList) {
+    saves = savesList;
+
+    // 清空列表
+    saveList.innerHTML = '';
+
+    // 添加存档项
+    saves.forEach(save => {
+      const saveItem = document.createElement('div');
+      saveItem.className = 'save-item';
+      saveItem.dataset.id = save.id;
+
+      if (selectedSaveId === save.id) {
+        saveItem.classList.add('selected');
+      }
+
+      // 添加存档信息
+      const saveInfo = document.createElement('div');
+      saveInfo.className = 'save-info';
+
+      const saveName = document.createElement('h3');
+      saveName.textContent = save.name;
+      saveInfo.appendChild(saveName);
+
+      const saveDesc = document.createElement('p');
+      saveDesc.textContent = save.description;
+      saveInfo.appendChild(saveDesc);
+
+      const saveDate = document.createElement('span');
+      saveDate.className = 'save-date';
+      saveDate.textContent = `最后游玩: ${new Date(save.lastPlayedAt).toLocaleString()}`;
+      saveInfo.appendChild(saveDate);
+
+      saveItem.appendChild(saveInfo);
+
+      // 添加删除按钮
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'delete-button';
+      deleteButton.textContent = '删除';
+      deleteButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm('确定要删除这个世界吗？此操作不可恢复！')) {
+          // 模拟删除操作
+          saves = saves.filter(s => s.id !== save.id);
+          updateSaveList(saves);
+        }
+      });
+
+      saveItem.appendChild(deleteButton);
+
+      // 添加点击事件
+      saveItem.addEventListener('click', () => {
+        selectSave(save.id);
+      });
+
+      saveList.appendChild(saveItem);
     });
-  },
-  hide: () => {}
-});
+
+    // 更新进入按钮状态
+    enterButton.disabled = selectedSaveId === null;
+  }
+
+  // 选择存档
+  function selectSave(saveId) {
+    selectedSaveId = saveId;
+
+    // 更新选中状态
+    const saveItems = saveList.querySelectorAll('.save-item');
+    saveItems.forEach(item => {
+      if (item.dataset.id === saveId) {
+        item.classList.add('selected');
+      } else {
+        item.classList.remove('selected');
+      }
+    });
+
+    // 更新进入按钮状态
+    enterButton.disabled = false;
+  }
+
+  // 进入选中的存档
+  function enterSelectedSave() {
+    if (selectedSaveId) {
+      // 隐藏存档菜单
+      hide();
+
+      // 显示加载屏幕
+      document.getElementById('loading-screen').style.display = 'flex';
+
+      // 开始游戏
+      startGame();
+    }
+  }
+
+  // 显示创建存档表单
+  function showCreateSaveForm() {
+    saveList.style.display = 'none';
+    buttonContainer.style.display = 'none';
+    createSaveForm.style.display = 'block';
+  }
+
+  // 隐藏创建存档表单
+  function hideCreateSaveForm() {
+    saveList.style.display = 'grid';
+    buttonContainer.style.display = 'flex';
+    createSaveForm.style.display = 'none';
+  }
+
+  // 创建新存档
+  function createNewSave() {
+    const name = nameInput.value.trim();
+    const description = descInput.value.trim();
+    const environment = envSelect.value;
+
+    if (!name) {
+      alert('请输入世界名称');
+      return;
+    }
+
+    // 模拟创建新存档
+    const newSave = {
+      id: 'new-' + Date.now(),
+      name,
+      description,
+      environment,
+      lastPlayedAt: Date.now()
+    };
+
+    // 添加到存档列表
+    saves.push(newSave);
+
+    // 重置表单
+    nameInput.value = '';
+    descInput.value = '';
+
+    // 隐藏表单
+    hideCreateSaveForm();
+
+    // 更新存档列表
+    updateSaveList(saves);
+
+    // 选中新存档
+    selectSave(newSave.id);
+  }
+
+  return {
+    show,
+    hide,
+    updateSaveList
+  };
+};
 
 // 游戏状态
 const gameState = {
@@ -97,28 +350,8 @@ async function initGame() {
     // 显示加载屏幕
     updateLoadingProgress(0, '初始化游戏...');
 
-    // 初始化渲染器
-    updateLoadingProgress(10, '初始化渲染器...');
-    renderer = await initRenderer(document.getElementById('game-canvas'));
-
-    // 初始化输入系统
-    updateLoadingProgress(20, '初始化输入系统...');
-    inputSystem = initInputSystem(gameState);
-
-    // 初始化物理系统
-    updateLoadingProgress(30, '初始化物理系统...');
-    physicsSystem = initPhysics();
-
-    // 初始化世界
-    updateLoadingProgress(40, '生成世界...');
-    worldSystem = await initWorld(renderer.scene);
-
-    // 初始化UI
-    updateLoadingProgress(60, '初始化界面...');
-    uiSystem = initUI(gameState);
-
     // 初始化网络客户端
-    updateLoadingProgress(80, '连接到服务器...');
+    updateLoadingProgress(50, '连接到服务器...');
     networkClient = await initNetworkClient(gameState);
 
     // 初始化存档菜单
@@ -144,12 +377,34 @@ function startGame() {
   // 隐藏存档菜单
   saveMenu.hide();
 
-  // 显示游戏UI
-  document.getElementById('ui-overlay').classList.remove('hidden');
-  gameState.isLoading = false;
+  // 初始化游戏组件
+  updateLoadingProgress(10, '初始化渲染器...');
+  renderer = initRenderer(document.getElementById('game-canvas'));
 
-  // 开始游戏循环
-  gameLoop();
+  updateLoadingProgress(30, '初始化输入系统...');
+  inputSystem = initInputSystem(gameState);
+
+  updateLoadingProgress(50, '初始化物理系统...');
+  physicsSystem = initPhysics();
+
+  updateLoadingProgress(70, '生成世界...');
+  worldSystem = initWorld(renderer.scene);
+
+  updateLoadingProgress(90, '初始化界面...');
+  uiSystem = initUI(gameState);
+
+  // 完成加载
+  updateLoadingProgress(100, '加载完成!');
+
+  // 隐藏加载屏幕，显示游戏UI
+  setTimeout(() => {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('ui-overlay').classList.remove('hidden');
+    gameState.isLoading = false;
+
+    // 开始游戏循环
+    gameLoop();
+  }, 1000);
 }
 
 // 更新加载进度
