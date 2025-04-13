@@ -1,17 +1,14 @@
-# Minecraft风格沙盒游戏
+# 开放世界建设游戏
 
-这是一个基于Three.js的Minecraft风格沙盒游戏，支持体素世界生成、方块破坏和放置、物理系统等功能。
+一个基于Web的开放世界多人建设游戏，类似Minecraft的沙盒体验。
 
-## 特性
+## 特点
 
-- 基于体素的世界生成
-- 程序化地形生成
-- 第一人称视角控制
-- 方块破坏和放置
-- 物品栏系统
-- 物理和碰撞检测
-- 昼夜循环
-- 多人游戏支持（计划中）
+- 程序化生成的无限地形
+- 方块化建造系统
+- 第一人称控制
+- 多人在线游戏
+- 基于物理的交互
 
 ## 技术栈
 
@@ -20,47 +17,44 @@
   - JavaScript/ES6+ - 核心逻辑
   - HTML5/CSS3 - 用户界面
 
-- **后端**（多人游戏）：
+- **后端**：
   - Node.js
-  - Socket.io - 实时通信
+  - Socket.IO - 实时通信
   - Express - Web服务器
 
 ## 项目结构
 
 ```
 /src
-  /components          # React UI组件（计划中）
-    /ui                # 游戏界面（物品栏、菜单）
-    /game              # Three.js集成
   /engine
-    /voxel             # 方块和区块逻辑
-    /rendering         # 网格生成、纹理
-    /physics           # 碰撞、移动
-    /generation        # 世界生成算法
-    /entities          # 玩家、生物
-  /utils               # 辅助函数
-  /assets
-    /textures          # 方块和物品纹理
-    /models            # 任何非方块3D模型
-    /sounds            # 游戏音频
-  /types               # TypeScript类型定义（计划中）
-  /state               # 游戏状态管理
-  /networking          # 多人游戏功能
+    /core              # 游戏核心系统
+    /rendering         # 渲染相关
+    /world             # 世界和方块系统
+    /entities          # 玩家和实体
+    /ui                # 用户界面
+    /utils             # 工具类
+  /network             # 网络通信
+/public
+  /assets              # 游戏资源
+    /textures          # 纹理
+    /icons             # 图标
+  /css                 # 样式文件
+/server                # 服务器代码
 ```
 
 ## 开发路线图
 
-### 最小可行产品(MVP)阶段
+### 基础阶段
 - [x] 基本方块渲染和玩家移动
-- [x] 简单的平坦世界生成
+- [x] 简单的世界生成
 - [x] 方块破坏/放置
 - [x] 基本碰撞检测
 
 ### 核心功能阶段
-- [ ] 程序化地形生成（包括不同生物群系）
+- [ ] 改进的程序化地形生成
+- [ ] 完善的方块系统
 - [ ] 物品栏和简单合成系统
-- [ ] 基本昼夜循环
-- [ ] 更复杂的物理和碰撞
+- [ ] 存储和加载功能
 
 ### 扩展功能阶段
 - [ ] 多人游戏支持
@@ -76,52 +70,42 @@
 
 ## 安装和运行
 
-1. 克隆仓库：
-   ```
-   git clone https://github.com/yourusername/minecraft-style-game.git
-   cd minecraft-style-game
-   ```
-
-2. 安装依赖：
-   ```
+1. 安装依赖：
+   ```bash
    npm install
    ```
 
-3. 运行开发服务器：
-   ```
-   npm run dev
+2. 启动开发服务器：
+   ```bash
+   npm start
    ```
 
-4. 构建生产版本：
-   ```
+   这将同时启动前端开发服务器和后端服务器。
+
+3. 构建生产版本：
+   ```bash
    npm run build
    ```
 
-## 控制方式
+## 游戏控制
 
 - **WASD** - 移动
 - **空格** - 跳跃
+- **左Shift** - 冲刺
+- **F** - 切换飞行模式
+- **鼠标** - 视角控制
 - **鼠标左键** - 破坏方块
 - **鼠标右键** - 放置方块
-- **鼠标滚轮** - 切换物品栏
-- **数字键1-9** - 直接选择物品栏槽位
-- **ESC** - 暂停游戏
-
-## 贡献
-
-欢迎贡献代码、报告问题或提出新功能建议！请遵循以下步骤：
-
-1. Fork 仓库
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add some amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
+- **数字键1-9** - 选择物品栏
+- **F3** - 切换调试信息
+- **ESC** - 退出指针锁定
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
+本项目采用 MIT 许可证。
 
 ## 致谢
 
 - [Three.js](https://threejs.org/) - 强大的JavaScript 3D库
+- [Socket.IO](https://socket.io/) - 实时通信库
 - [Minecraft](https://www.minecraft.net/) - 灵感来源

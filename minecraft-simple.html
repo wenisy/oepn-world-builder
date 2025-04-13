@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易方块世界</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            opacity: 0.7;
+        }
+        #debug-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 3px;
+        }
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-overlay">
+        <div id="crosshair">+</div>
+        <div id="debug-info"></div>
+    </div>
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>加载中...</h1>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+    <script>
+        // 简化版方块游戏
+        class MinecraftSimple {
+            constructor() {
+                // 初始化场景
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87CEEB);
+                
+                // 初始化相机
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 10, 0);
+                
+                // 初始化渲染器
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(this.renderer.domElement);
+                
+                // 添加光源
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+                directionalLight.position.set(10, 20, 5);
+                this.scene.add(directionalLight);
+                
+                // 玩家状态
+                this.player = {
+                    position: new THREE.Vector3(0, 10, 0),
+                    rotation: new THREE.Vector2(0, 0),
+                    velocity: new THREE.Vector3(0, 0, 0),
+                    speed: 5,
+                    jumpForce: 8,
+                    gravity: 20,
+                    grounded: false,
+                    flying: true
+                };
+                
+                // 方块数据
+                this.blocks = new Map();
+                this.blockMaterials = {
+                    1: new THREE.MeshLambertMaterial({ color: 0x8B4513 }), // 泥土
+                    2: new THREE.MeshLambertMaterial({ color: 0x7CFC00 }), // 草方块
+                    3: new THREE.MeshLambertMaterial({ color: 0x808080 }), // 石头
+                    4: new THREE.MeshLambertMaterial({ color: 0xFFD700 }), // 沙子
+                    5: new THREE.MeshLambertMaterial({ color: 0x654321 }), // 木头
+                    6: new THREE.MeshLambertMaterial({ color: 0x228B22 })  // 树叶
+                };
+                
+                // 选中的方块
+                this.selectedBlock = null;
+                this.selectedBlockFace = null;
+                this.currentBlockType = 1;
+                
+                // 射线投射器
+                this.raycaster = new THREE.Raycaster();
+                
+                // 输入状态
+                this.keys = {};
+                this.pointerLocked = false;
+                
+                // UI元素
+                this.debugInfo = document.getElementById('debug-info');
+                this.loadingScreen = document.getElementById('loading-screen');
+                
+                // 初始化
+                this.init();
+            }
+            
+            // 初始化
+            async init() {
+                // 设置事件监听器
+                this.setupEventListeners();
+                
+                // 生成世界
+                this.generateWorld();
+                
+                // 隐藏加载屏幕
+                this.loadingScreen.style.display = 'none';
+                
+                // 开始游戏循环
+                this.lastTime = performance.now();
+                this.animate();
+            }
+            
+            // 设置事件监听器
+            setupEventListeners() {
+                // 键盘事件
+                window.addEventListener('keydown', (event) => {
+                    this.keys[event.code] = true;
+                    
+                    // 数字键选择方块类型
+                    if (event.code.startsWith('Digit')) {
+                        const num = parseInt(event.code.slice(5));
+                        if (num >= 1 && num <= 6) {
+                            this.currentBlockType = num;
+                        }
+                    }
+                    
+                    // F键切换飞行模式
+                    if (event.code === 'KeyF') {
+                        this.player.flying = !this.player.flying;
+                    }
+                });
+                
+                window.addEventListener('keyup', (event) => {
+                    this.keys[event.code] = false;
+                });
+                
+                // 鼠标事件
+                document.addEventListener('mousemove', (event) => {
+                    if (this.pointerLocked) {
+                        this.player.rotation.y -= event.movementX * 0.002;
+                        this.player.rotation.x -= event.movementY * 0.002;
+                        
+                        // 限制上下视角
+                        this.player.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.player.rotation.x));
+                    }
+                });
+                
+                document.addEventListener('mousedown', (event) => {
+                    if (!this.pointerLocked) {
+                        document.body.requestPointerLock();
+                        return;
+                    }
+                    
+                    // 左键破坏方块
+                    if (event.button === 0) {
+                        this.breakBlock();
+                    }
+                    
+                    // 右键放置方块
+                    if (event.button === 2) {
+                        this.placeBlock();
+                    }
+                });
+                
+                // 阻止右键菜单
+                document.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                });
+                
+                // 指针锁定事件
+                document.addEventListener('pointerlockchange', () => {
+                    this.pointerLocked = document.pointerLockElement !== null;
+                });
+                
+                // 窗口大小调整
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            // 生成世界
+            generateWorld() {
+                // 生成地形
+                const size = 16;
+                const height = 8;
+                
+                // 创建方块几何体
+                this.blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+                
+                // 生成平坦地形
+                for (let x = -size; x < size; x++) {
+                    for (let z = -size; z < size; z++) {
+                        // 基础高度
+                        let y = 0;
+                        
+                        // 添加一些随机高度变化
+                        const noise = this.simplex2(x * 0.1, z * 0.1);
+                        y = Math.floor(noise * 3);
+                        
+                        // 设置方块
+                        this.setBlock(x, y, z, 3); // 石头
+                        
+                        // 添加泥土层
+                        for (let dy = 1; dy <= 3; dy++) {
+                            if (y + dy < height) {
+                                this.setBlock(x, y + dy, z, 1); // 泥土
+                            }
+                        }
+                        
+                        // 添加草方块
+                        if (y + 4 < height) {
+                            this.setBlock(x, y + 4, z, 2); // 草方块
+                        }
+                        
+                        // 随机添加树
+                        if (Math.random() < 0.02) {
+                            this.generateTree(x, y + 5, z);
+                        }
+                    }
+                }
+            }
+            
+            // 生成树
+            generateTree(x, y, z) {
+                // 树干
+                for (let dy = 0; dy < 5; dy++) {
+                    this.setBlock(x, y + dy, z, 5); // 木头
+                }
+                
+                // 树叶
+                for (let dx = -2; dx <= 2; dx++) {
+                    for (let dz = -2; dz <= 2; dz++) {
+                        for (let dy = 3; dy <= 6; dy++) {
+                            // 跳过树干位置
+                            if (dx === 0 && dz === 0 && dy < 5) continue;
+                            
+                            // 计算到树干的距离
+                            const distance = Math.sqrt(dx * dx + dz * dz);
+                            
+                            // 距离越远，生成叶子的概率越低
+                            if (distance <= 2 && Math.random() < (1 - distance * 0.3)) {
+                                this.setBlock(x + dx, y + dy, z + dz, 6); // 树叶
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 设置方块
+            setBlock(x, y, z, type) {
+                const key = `${x},${y},${z}`;
+                
+                // 如果是空气方块，则移除现有方块
+                if (type === 0) {
+                    if (this.blocks.has(key)) {
+                        const block = this.blocks.get(key);
+                        this.scene.remove(block);
+                        this.blocks.delete(key);
+                    }
+                    return;
+                }
+                
+                // 如果已经有方块，则先移除
+                if (this.blocks.has(key)) {
+                    const block = this.blocks.get(key);
+                    this.scene.remove(block);
+                }
+                
+                // 创建新方块
+                const material = this.blockMaterials[type];
+                if (!material) return;
+                
+                const block = new THREE.Mesh(this.blockGeometry, material);
+                block.position.set(x, y, z);
+                block.userData.type = type;
+                block.userData.position = { x, y, z };
+                
+                // 添加到场景和映射表
+                this.scene.add(block);
+                this.blocks.set(key, block);
+            }
+            
+            // 获取方块
+            getBlock(x, y, z) {
+                const key = `${x},${y},${z}`;
+                return this.blocks.get(key);
+            }
+            
+            // 破坏方块
+            breakBlock() {
+                if (this.selectedBlock) {
+                    const { x, y, z } = this.selectedBlock.userData.position;
+                    this.setBlock(x, y, z, 0); // 设置为空气
+                    this.selectedBlock = null;
+                }
+            }
+            
+            // 放置方块
+            placeBlock() {
+                if (this.selectedBlock && this.selectedBlockFace) {
+                    const { x, y, z } = this.selectedBlock.userData.position;
+                    let nx = x, ny = y, nz = z;
+                    
+                    // 根据选中的面确定放置位置
+                    switch (this.selectedBlockFace) {
+                        case 'px': nx += 1; break;
+                        case 'nx': nx -= 1; break;
+                        case 'py': ny += 1; break;
+                        case 'ny': ny -= 1; break;
+                        case 'pz': nz += 1; break;
+                        case 'nz': nz -= 1; break;
+                    }
+                    
+                    // 检查是否与玩家碰撞
+                    const playerPos = this.player.position;
+                    const playerSize = { width: 0.6, height: 1.8 };
+                    
+                    if (Math.abs(nx - playerPos.x) < (playerSize.width / 2 + 0.5) &&
+                        Math.abs(nz - playerPos.z) < (playerSize.width / 2 + 0.5) &&
+                        ny > playerPos.y - 0.5 &&
+                        ny < playerPos.y + playerSize.height) {
+                        return; // 与玩家碰撞，不放置方块
+                    }
+                    
+                    // 放置方块
+                    this.setBlock(nx, ny, nz, this.currentBlockType);
+                }
+            }
+            
+            // 更新方块选择
+            updateBlockSelection() {
+                // 重置选中的方块
+                this.selectedBlock = null;
+                this.selectedBlockFace = null;
+                
+                // 设置射线起点和方向
+                const direction = new THREE.Vector3(0, 0, -1);
+                direction.applyQuaternion(this.camera.quaternion);
+                
+                this.raycaster.set(this.camera.position, direction);
+                
+                // 获取所有方块
+                const blocks = Array.from(this.blocks.values());
+                
+                // 射线检测
+                const intersects = this.raycaster.intersectObjects(blocks);
+                
+                if (intersects.length > 0) {
+                    const intersection = intersects[0];
+                    this.selectedBlock = intersection.object;
+                    
+                    // 确定选中的面
+                    const normal = intersection.face.normal.clone();
+                    normal.transformDirection(this.selectedBlock.matrixWorld);
+                    
+                    if (Math.abs(normal.x) > 0.5) {
+                        this.selectedBlockFace = normal.x > 0 ? 'px' : 'nx';
+                    } else if (Math.abs(normal.y) > 0.5) {
+                        this.selectedBlockFace = normal.y > 0 ? 'py' : 'ny';
+                    } else if (Math.abs(normal.z) > 0.5) {
+                        this.selectedBlockFace = normal.z > 0 ? 'pz' : 'nz';
+                    }
+                }
+            }
+            
+            // 更新玩家
+            updatePlayer(deltaTime) {
+                // 移动方向
+                const moveDirection = new THREE.Vector3(0, 0, 0);
+                
+                // 前后移动
+                if (this.keys['KeyW']) moveDirection.z -= 1;
+                if (this.keys['KeyS']) moveDirection.z += 1;
+                
+                // 左右移动
+                if (this.keys['KeyA']) moveDirection.x -= 1;
+                if (this.keys['KeyD']) moveDirection.x += 1;
+                
+                // 标准化移动方向
+                if (moveDirection.length() > 0) {
+                    moveDirection.normalize();
+                }
+                
+                // 应用相机旋转
+                const rotationMatrix = new THREE.Matrix4();
+                rotationMatrix.makeRotationY(this.player.rotation.y);
+                moveDirection.applyMatrix4(rotationMatrix);
+                
+                // 应用移动速度
+                const speed = this.keys['ShiftLeft'] ? this.player.speed * 2 : this.player.speed;
+                this.player.velocity.x = moveDirection.x * speed;
+                this.player.velocity.z = moveDirection.z * speed;
+                
+                // 飞行模式
+                if (this.player.flying) {
+                    if (this.keys['Space']) this.player.velocity.y = speed;
+                    else if (this.keys['ControlLeft']) this.player.velocity.y = -speed;
+                    else this.player.velocity.y = 0;
+                } else {
+                    // 跳跃
+                    if (this.keys['Space'] && this.player.grounded) {
+                        this.player.velocity.y = this.player.jumpForce;
+                        this.player.grounded = false;
+                    }
+                    
+                    // 应用重力
+                    if (!this.player.grounded) {
+                        this.player.velocity.y -= this.player.gravity * deltaTime;
+                    }
+                }
+                
+                // 应用速度
+                this.player.position.x += this.player.velocity.x * deltaTime;
+                this.player.position.z += this.player.velocity.z * deltaTime;
+                this.player.position.y += this.player.velocity.y * deltaTime;
+                
+                // 碰撞检测
+                this.handleCollisions();
+                
+                // 更新相机
+                this.updateCamera();
+            }
+            
+            // 处理碰撞
+            handleCollisions() {
+                // 简化的碰撞检测
+                const playerSize = { width: 0.6, height: 1.8 };
+                const pos = this.player.position;
+                
+                // 检查脚下的方块
+                const floorX = Math.floor(pos.x);
+                const floorY = Math.floor(pos.y - 0.1);
+                const floorZ = Math.floor(pos.z);
+                
+                // 检查是否站在方块上
+                const blockBelow = this.getBlock(floorX, floorY, floorZ);
+                if (blockBelow && pos.y < floorY + 1.0 && this.player.velocity.y < 0) {
+                    pos.y = floorY + 1.0;
+                    this.player.velocity.y = 0;
+                    this.player.grounded = true;
+                } else {
+                    this.player.grounded = false;
+                }
+                
+                // 水平碰撞检测
+                const checkCollision = (x, y, z) => {
+                    return this.getBlock(x, y, z) !== undefined;
+                };
+                
+                // 检查玩家周围的方块
+                const positions = [
+                    { x: pos.x - playerSize.width/2, z: pos.z - playerSize.width/2 },
+                    { x: pos.x + playerSize.width/2, z: pos.z - playerSize.width/2 },
+                    { x: pos.x - playerSize.width/2, z: pos.z + playerSize.width/2 },
+                    { x: pos.x + playerSize.width/2, z: pos.z + playerSize.width/2 }
+                ];
+                
+                for (const p of positions) {
+                    const blockX = Math.floor(p.x);
+                    const blockZ = Math.floor(p.z);
+                    
+                    // 检查玩家高度范围内的方块
+                    for (let y = Math.floor(pos.y); y < Math.floor(pos.y + playerSize.height); y++) {
+                        if (checkCollision(blockX, y, blockZ)) {
+                            // 计算推出方向
+                            const pushX = pos.x - (blockX + 0.5);
+                            const pushZ = pos.z - (blockZ + 0.5);
+                            
+                            // 标准化并应用推力
+                            const length = Math.sqrt(pushX * pushX + pushZ * pushZ);
+                            if (length > 0) {
+                                const pushScale = (playerSize.width/2 + 0.5) / length;
+                                pos.x = blockX + 0.5 + pushX * pushScale;
+                                pos.z = blockZ + 0.5 + pushZ * pushScale;
+                            }
+                        }
+                    }
+                }
+                
+                // 检查头部碰撞
+                if (this.player.velocity.y > 0) {
+                    const headX = Math.floor(pos.x);
+                    const headY = Math.floor(pos.y + playerSize.height);
+                    const headZ = Math.floor(pos.z);
+                    
+                    if (checkCollision(headX, headY, headZ)) {
+                        this.player.velocity.y = 0;
+                    }
+                }
+            }
+            
+            // 更新相机
+            updateCamera() {
+                // 设置相机位置
+                this.camera.position.copy(this.player.position);
+                this.camera.position.y += 1.6; // 眼睛高度
+                
+                // 设置相机旋转
+                this.camera.rotation.order = 'YXZ';
+                this.camera.rotation.x = this.player.rotation.x;
+                this.camera.rotation.y = this.player.rotation.y;
+            }
+            
+            // 更新调试信息
+            updateDebugInfo() {
+                if (this.debugInfo) {
+                    const pos = this.player.position;
+                    const rot = this.player.rotation;
+                    const blockType = ['空气', '泥土', '草方块', '石头', '沙子', '木头', '树叶'][this.currentBlockType] || '未知';
+                    
+                    this.debugInfo.innerHTML = `
+                        位置: X=${pos.x.toFixed(2)}, Y=${pos.y.toFixed(2)}, Z=${pos.z.toFixed(2)}<br>
+                        朝向: X=${(rot.x * (180 / Math.PI)).toFixed(0)}°, Y=${(rot.y * (180 / Math.PI)).toFixed(0)}°<br>
+                        FPS: ${Math.round(1 / this.deltaTime)}<br>
+                        模式: ${this.player.flying ? '飞行' : '生存'}<br>
+                        当前方块: ${blockType} (${this.currentBlockType})<br>
+                        方块数量: ${this.blocks.size}
+                    `;
+                }
+            }
+            
+            // 动画循环
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                // 计算时间增量
+                const now = performance.now();
+                this.deltaTime = Math.min((now - this.lastTime) / 1000, 0.1); // 限制最大时间步长
+                this.lastTime = now;
+                
+                // 更新玩家
+                this.updatePlayer(this.deltaTime);
+                
+                // 更新方块选择
+                this.updateBlockSelection();
+                
+                // 更新调试信息
+                this.updateDebugInfo();
+                
+                // 渲染场景
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            // 简化版柏林噪声
+            simplex2(x, y) {
+                const F2 = 0.5 * (Math.sqrt(3) - 1);
+                const G2 = (3 - Math.sqrt(3)) / 6;
+                
+                const s = (x + y) * F2;
+                const i = Math.floor(x + s);
+                const j = Math.floor(y + s);
+                
+                const t = (i + j) * G2;
+                const X0 = i - t;
+                const Y0 = j - t;
+                const x0 = x - X0;
+                const y0 = y - Y0;
+                
+                let i1, j1;
+                if (x0 > y0) {
+                    i1 = 1; j1 = 0;
+                } else {
+                    i1 = 0; j1 = 1;
+                }
+                
+                const x1 = x0 - i1 + G2;
+                const y1 = y0 - j1 + G2;
+                const x2 = x0 - 1 + 2 * G2;
+                const y2 = y0 - 1 + 2 * G2;
+                
+                const n0 = this.gradNoise(i, j, x0, y0);
+                const n1 = this.gradNoise(i + i1, j + j1, x1, y1);
+                const n2 = this.gradNoise(i + 1, j + 1, x2, y2);
+                
+                return 70 * (n0 + n1 + n2);
+            }
+            
+            gradNoise(i, j, x, y) {
+                const h = this.hash(i * 1526 + j * 1764) % 12;
+                const grad = this.grads[h];
+                return grad.x * x + grad.y * y;
+            }
+            
+            hash(n) {
+                n = ((n >> 16) ^ n) * 0x45d9f3b;
+                n = ((n >> 16) ^ n) * 0x45d9f3b;
+                n = (n >> 16) ^ n;
+                return n;
+            }
+            
+            // 梯度向量
+            grads = [
+                { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+                { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 },
+                { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
+            ];
+        }
+        
+        // 创建游戏实例
+        window.addEventListener('load', () => {
+            const game = new MinecraftSimple();
+        });
+    </script>
+</body>
+</html>

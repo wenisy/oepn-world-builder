@@ -1,58 +1,62 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>开放世界建设者</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./public/css/style.css">
-    <link rel="stylesheet" href="./public/css/ui.css">
+    <title>方块世界建设游戏</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #333;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #4CAF50;
+        }
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            max-width: 600px;
+        }
+        .buttons {
+            display: flex;
+            gap: 20px;
+        }
+        .button {
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <!-- 游戏容器 -->
-    <div id="game-container">
-        <canvas id="game-canvas"></canvas>
+    <h1>方块世界建设游戏</h1>
+    <p>欢迎来到方块世界建设游戏！这是一个类似Minecraft的沙盒游戏，您可以在这里自由建造、探索和创造。</p>
 
-        <!-- UI覆盖层 -->
-        <div id="ui-overlay" class="hidden">
-            <!-- 顶部菜单 -->
-            <div id="top-menu">
-                <div id="player-info">
-                    <span id="player-name">玩家</span>
-                    <span id="player-resources">资源: 100</span>
-                </div>
-                <div id="game-controls">
-                    <button id="build-button">建造</button>
-                    <button id="social-button">社交</button>
-                    <button id="settings-button">设置</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 加载屏幕 -->
-        <div id="loading-screen">
-            <div class="loading-content">
-                <h1>开放世界建设者</h1>
-                <div class="progress-bar">
-                    <div class="progress"></div>
-                </div>
-                <p class="loading-text">正在加载游戏资源...</p>
-                <button id="debug-start" style="margin-top: 20px; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">手动开始游戏</button>
-            </div>
-        </div>
+    <div class="buttons">
+        <a href="/minecraft-simple.html" class="button">开始游戏</a>
+        <a href="/simple-game.html" class="button">简易版本</a>
+        <a href="/test.html" class="button">测试版本</a>
+        <a href="/minecraft-clone/index.html" class="button">真实Minecraft体验</a>
     </div>
-
-    <!-- 使用 importmap 导入 Three.js -->
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
-            }
-        }
-    </script>
-    
-    <!-- 加载游戏脚本 -->
-    <script type="module" src="./src/main.js"></script>
 </body>
 </html>
