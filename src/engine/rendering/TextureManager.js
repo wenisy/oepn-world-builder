@@ -1,24 +1,54 @@
 /**
  * 纹理管理器 - 负责加载和管理游戏纹理
  */
+import * as THREE from 'three';
 export class TextureManager {
   constructor() {
     // 纹理加载器
     this.loader = new THREE.TextureLoader();
-    
+
+    // 纹理缓存
+    this.textures = new Map();
+
+    // 默认纹理 - 紫色和黑色棋盘格
+    this.defaultTexture = this.createDefaultTexture();
+
+    // 将默认纹理添加到缓存
+    this.textures.set('default', this.defaultTexture);
+
     // 纹理图集
-    this.atlas = null;
-    
-    // 纹理坐标映射
-    this.textureCoords = new Map();
-    
-    // 纹理大小
-    this.textureSize = 16; // 默认16x16像素
-    
-    // 图集大小
-    this.atlasSize = 256; // 默认256x256像素
+    this.textureAtlas = null;
+
+    // 纹理图集大小
+    this.atlasSize = 16;
+
+    // 纹理图集映射
+    this.atlasMap = new Map();
   }
-  
+
+  /**
+   * 创建默认纹理（紫色和黑色棋盘格）
+   * @returns {THREE.Texture} 默认纹理
+   */
+  createDefaultTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d');
+
+    // 绘制紫色和黑色棋盘格
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, 16, 16);
+    ctx.fillStyle = '#FF00FF';
+    ctx.fillRect(0, 0, 8, 8);
+    ctx.fillRect(8, 8, 8, 8);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    return texture;
+  }
+
   /**
    * 加载纹理图集
    * @param {BlockRegistry} blockRegistry - 方块注册表
@@ -26,249 +56,208 @@ export class TextureManager {
    */
   async loadTextureAtlas(blockRegistry) {
     return new Promise((resolve) => {
-      // 创建图集画布
-      const canvas = document.createElement('canvas');
-      canvas.width = this.atlasSize;
-      canvas.height = this.atlasSize;
-      const ctx = canvas.getContext('2d');
-      
       // 获取所有方块
       const blocks = blockRegistry.getAllBlocks();
-      
-      // 计算每行可以放置的纹理数量
-      const texturesPerRow = Math.floor(this.atlasSize / this.textureSize);
-      
+
       // 加载计数
       let loadedCount = 0;
-      let totalTextures = 0;
-      
-      // 计算需要加载的纹理总数
-      for (const block of blocks) {
-        if (block.texture) {
-          totalTextures++;
-        } else if (block.textureMap) {
-          for (const face in block.textureMap) {
-            totalTextures++;
-          }
-        }
-      }
-      
-      // 如果没有纹理需要加载
+      let totalTextures = blocks.length;
+
+      // 如果没有方块，直接完成
       if (totalTextures === 0) {
-        // 创建默认纹理
-        this.createDefaultTexture(canvas);
+        console.log('没有方块需要加载纹理');
         resolve();
         return;
       }
-      
-      // 纹理索引
-      let textureIndex = 0;
-      
+
+      console.log(`开始加载 ${totalTextures} 个纹理`);
+
       // 加载每个方块的纹理
       for (const block of blocks) {
-        if (block.texture) {
-          // 单一纹理
-          this.loadTexture(block.texture, (texture) => {
-            // 计算纹理在图集中的位置
-            const x = (textureIndex % texturesPerRow) * this.textureSize;
-            const y = Math.floor(textureIndex / texturesPerRow) * this.textureSize;
-            
-            // 绘制到图集
-            if (texture) {
-              ctx.drawImage(texture.image, x, y, this.textureSize, this.textureSize);
-            } else {
-              // 绘制默认纹理
-              this.drawDefaultTexture(ctx, x, y);
-            }
-            
-            // 存储纹理坐标
-            this.textureCoords.set(block.id, {
-              x: x / this.atlasSize,
-              y: y / this.atlasSize,
-              w: this.textureSize / this.atlasSize,
-              h: this.textureSize / this.atlasSize
-            });
-            
-            // 更新计数
-            textureIndex++;
-            loadedCount++;
-            
-            // 检查是否所有纹理都已加载
-            if (loadedCount === totalTextures) {
-              this.createAtlasTexture(canvas, resolve);
-            }
-          });
-        } else if (block.textureMap) {
-          // 多纹理（不同面使用不同纹理）
-          const faceCoords = {};
-          
-          // 加载每个面的纹理
-          for (const face in block.textureMap) {
-            const textureName = block.textureMap[face];
-            
-            this.loadTexture(textureName, (texture) => {
-              // 计算纹理在图集中的位置
-              const x = (textureIndex % texturesPerRow) * this.textureSize;
-              const y = Math.floor(textureIndex / texturesPerRow) * this.textureSize;
-              
-              // 绘制到图集
-              if (texture) {
-                ctx.drawImage(texture.image, x, y, this.textureSize, this.textureSize);
-              } else {
-                // 绘制默认纹理
-                this.drawDefaultTexture(ctx, x, y);
-              }
-              
-              // 存储纹理坐标
-              faceCoords[face] = {
-                x: x / this.atlasSize,
-                y: y / this.atlasSize,
-                w: this.textureSize / this.atlasSize,
-                h: this.textureSize / this.atlasSize
-              };
-              
-              // 更新计数
-              textureIndex++;
-              loadedCount++;
-              
-              // 检查是否所有纹理都已加载
-              if (loadedCount === totalTextures) {
-                this.createAtlasTexture(canvas, resolve);
-              }
-            });
+        const textureName = block.texture || block.name;
+
+        // 尝试加载纹理
+        this.loadTexture(textureName, (texture) => {
+          loadedCount++;
+
+          // 如果纹理加载成功，存储到缓存
+          if (texture) {
+            this.textures.set(textureName, texture);
+            console.log(`纹理加载成功: ${textureName}`);
+          } else {
+            console.warn(`纹理加载失败: ${textureName}，使用默认纹理`);
+            this.textures.set(textureName, this.defaultTexture);
           }
-          
-          // 存储面纹理坐标
-          this.textureCoords.set(block.id, faceCoords);
-        } else {
-          // 没有纹理，使用颜色
-          // 计算纹理在图集中的位置
-          const x = (textureIndex % texturesPerRow) * this.textureSize;
-          const y = Math.floor(textureIndex / texturesPerRow) * this.textureSize;
-          
-          // 绘制颜色方块
-          ctx.fillStyle = `#${block.color.toString(16).padStart(6, '0')}`;
-          ctx.fillRect(x, y, this.textureSize, this.textureSize);
-          
-          // 存储纹理坐标
-          this.textureCoords.set(block.id, {
-            x: x / this.atlasSize,
-            y: y / this.atlasSize,
-            w: this.textureSize / this.atlasSize,
-            h: this.textureSize / this.atlasSize
-          });
-          
-          // 更新计数
-          textureIndex++;
-        }
+
+          // 检查是否所有纹理都已加载
+          if (loadedCount === totalTextures) {
+            console.log('所有纹理加载完成');
+            resolve();
+          }
+        });
       }
     });
   }
-  
+
   /**
    * 加载单个纹理
    * @param {string} name - 纹理名称
    * @param {Function} callback - 回调函数
    */
   loadTexture(name, callback) {
-    const path = `assets/textures/blocks/${name}.png`;
-    
-    this.loader.load(
-      path,
-      (texture) => {
-        // 设置像素风格的过滤器
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        callback(texture);
-      },
-      undefined,
-      (error) => {
-        console.error(`无法加载纹理 ${path}:`, error);
-        callback(null);
+    // 如果纹理已经在缓存中，直接返回
+    if (this.textures.has(name)) {
+      callback(this.textures.get(name));
+      return;
+    }
+
+    // 尝试不同的路径
+    const paths = [
+      `/assets/textures/blocks/${name}.png`,
+      `/textures/blocks/${name}.png`,
+      `/public/assets/textures/blocks/${name}.png`,
+      `/public/textures/blocks/${name}.png`
+    ];
+
+    // 记录当前尝试的路径索引
+    let pathIndex = 0;
+
+    const tryLoadTexture = () => {
+      if (pathIndex >= paths.length) {
+        console.error(`无法加载纹理 ${name}`);
+        // 所有路径都失败，返回默认纹理
+        callback(this.defaultTexture);
+        return;
       }
-    );
+
+      const path = paths[pathIndex];
+      console.log(`尝试加载纹理: ${path}`);
+
+      this.loader.load(
+        path,
+        (texture) => {
+          // 设置像素风格的过滤器
+          texture.magFilter = THREE.NearestFilter;
+          texture.minFilter = THREE.NearestFilter;
+          console.log(`纹理加载成功: ${path}`);
+          callback(texture);
+        },
+        undefined,
+        (error) => {
+          console.warn(`无法加载纹理 ${path}:`, error);
+          // 尝试下一个路径
+          pathIndex++;
+          tryLoadTexture();
+        }
+      );
+    };
+
+    // 开始尝试加载
+    tryLoadTexture();
   }
-  
+
   /**
-   * 创建默认纹理
-   * @param {HTMLCanvasElement} canvas - 画布
+   * 获取纹理
+   * @param {string} name - 纹理名称
+   * @returns {THREE.Texture} 纹理
    */
-  createDefaultTexture(canvas) {
-    const ctx = canvas.getContext('2d');
-    
-    // 绘制默认纹理
-    this.drawDefaultTexture(ctx, 0, 0);
-    
-    // 创建纹理
-    this.atlas = new THREE.CanvasTexture(canvas);
-    this.atlas.magFilter = THREE.NearestFilter;
-    this.atlas.minFilter = THREE.NearestFilter;
-    
-    // 存储默认纹理坐标
-    this.textureCoords.set('default', {
-      x: 0,
-      y: 0,
-      w: this.textureSize / this.atlasSize,
-      h: this.textureSize / this.atlasSize
-    });
+  getTexture(name) {
+    return this.textures.get(name) || this.defaultTexture;
   }
-  
-  /**
-   * 绘制默认纹理
-   * @param {CanvasRenderingContext2D} ctx - 画布上下文
-   * @param {number} x - X坐标
-   * @param {number} y - Y坐标
-   */
-  drawDefaultTexture(ctx, x, y) {
-    // 绘制紫黑相间的方格
-    ctx.fillStyle = '#FF00FF';
-    ctx.fillRect(x, y, this.textureSize, this.textureSize);
-    
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(x, y, this.textureSize / 2, this.textureSize / 2);
-    ctx.fillRect(x + this.textureSize / 2, y + this.textureSize / 2, this.textureSize / 2, this.textureSize / 2);
-  }
-  
-  /**
-   * 创建图集纹理
-   * @param {HTMLCanvasElement} canvas - 画布
-   * @param {Function} resolve - Promise解析函数
-   */
-  createAtlasTexture(canvas, resolve) {
-    // 创建纹理
-    this.atlas = new THREE.CanvasTexture(canvas);
-    this.atlas.magFilter = THREE.NearestFilter;
-    this.atlas.minFilter = THREE.NearestFilter;
-    
-    // 解析Promise
-    resolve();
-  }
-  
+
   /**
    * 获取纹理图集
    * @returns {THREE.Texture} 纹理图集
    */
   getTextureAtlas() {
-    return this.atlas;
+    if (!this.textureAtlas) {
+      this.createTextureAtlas();
+    }
+    return this.textureAtlas;
   }
-  
+
   /**
-   * 获取纹理坐标
-   * @param {number} blockId - 方块ID
-   * @param {string} face - 面名称
-   * @returns {Object} 纹理坐标
+   * 创建纹理图集
    */
-  getTextureCoords(blockId, face) {
-    const coords = this.textureCoords.get(blockId);
-    
-    if (!coords) {
-      return this.textureCoords.get('default');
+  createTextureAtlas() {
+    // 创建画布
+    const size = 1024; // 图集大小
+    const tileSize = 16; // 每个纹理的大小
+    const tilesPerRow = size / tileSize;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // 填充透明背景
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, size, size);
+
+    // 添加所有纹理
+    let index = 0;
+    for (const [name, texture] of this.textures.entries()) {
+      // 计算位置
+      const x = (index % tilesPerRow) * tileSize;
+      const y = Math.floor(index / tilesPerRow) * tileSize;
+
+      // 将纹理绘制到图集上
+      if (texture.image) {
+        ctx.drawImage(texture.image, x, y, tileSize, tileSize);
+      } else {
+        // 如果没有图像，使用默认纹理
+        ctx.fillStyle = '#FF00FF';
+        ctx.fillRect(x, y, tileSize, tileSize);
+      }
+
+      // 存储纹理在图集中的位置
+      this.atlasMap.set(name, {
+        index,
+        x,
+        y,
+        u: x / size,
+        v: y / size,
+        width: tileSize / size,
+        height: tileSize / size
+      });
+
+      index++;
     }
-    
-    if (typeof coords === 'object' && coords[face]) {
-      return coords[face];
+
+    // 创建纹理
+    this.textureAtlas = new THREE.CanvasTexture(canvas);
+    this.textureAtlas.magFilter = THREE.NearestFilter;
+    this.textureAtlas.minFilter = THREE.NearestFilter;
+
+    console.log(`创建纹理图集成功，包含 ${index} 个纹理`);
+  }
+
+  /**
+   * 获取纹理的UV坐标
+   * @param {string|number} textureIndex - 纹理索引或名称
+   * @returns {Array} UV坐标数组 [u1, v1, u2, v2, u3, v3, u4, v4]
+   */
+  getTextureUVs(textureIndex) {
+    // 如果是数字，将其转换为字符串
+    const textureName = typeof textureIndex === 'number' ? `texture_${textureIndex}` : textureIndex;
+
+    // 获取纹理信息
+    const textureInfo = this.atlasMap.get(textureName) || this.atlasMap.get('default');
+
+    if (!textureInfo) {
+      console.warn(`找不到纹理: ${textureName}`);
+      return [0, 0, 1, 0, 1, 1, 0, 1]; // 默认UV
     }
-    
-    return coords;
+
+    // 计算UV坐标
+    const { u, v, width, height } = textureInfo;
+
+    // 返回四个顶点的UV坐标
+    return [
+      u, v,                   // 左上
+      u + width, v,           // 右上
+      u + width, v + height,  // 右下
+      u, v + height           // 左下
+    ];
   }
 }

@@ -5,7 +5,7 @@ export class InputManager {
   constructor(player, domElement) {
     this.player = player;
     this.domElement = domElement;
-    
+
     // 按键映射
     this.keyMap = {
       'KeyW': 'forward',
@@ -16,10 +16,10 @@ export class InputManager {
       'ShiftLeft': 'sprint',
       'ControlLeft': 'sneak'
     };
-    
+
     // 鼠标锁定状态
     this.isLocked = false;
-    
+
     // 绑定事件处理函数
     this.onKeyDown = this.onKeyDown.bind(this);
     this.onKeyUp = this.onKeyUp.bind(this);
@@ -28,7 +28,7 @@ export class InputManager {
     this.onMouseUp = this.onMouseUp.bind(this);
     this.onWheel = this.onWheel.bind(this);
     this.onPointerLockChange = this.onPointerLockChange.bind(this);
-    
+
     // 添加事件监听器
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
@@ -37,7 +37,7 @@ export class InputManager {
     document.addEventListener('mouseup', this.onMouseUp);
     document.addEventListener('wheel', this.onWheel);
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
-    
+
     // 点击画布锁定鼠标
     this.domElement.addEventListener('click', () => {
       if (!this.isLocked) {
@@ -45,7 +45,7 @@ export class InputManager {
       }
     });
   }
-  
+
   /**
    * 键盘按下事件处理
    * @param {KeyboardEvent} event - 键盘事件
@@ -53,16 +53,16 @@ export class InputManager {
   onKeyDown(event) {
     // 如果鼠标未锁定，忽略游戏控制键
     if (!this.isLocked) return;
-    
+
     // 检查是否是映射的按键
     if (this.keyMap[event.code]) {
       // 设置输入状态
       this.player.setInput(this.keyMap[event.code], true);
-      
+
       // 阻止默认行为
       event.preventDefault();
     }
-    
+
     // 数字键选择物品栏槽位
     if (event.code.startsWith('Digit')) {
       const slot = parseInt(event.code.substring(5)) - 1;
@@ -71,7 +71,7 @@ export class InputManager {
       }
     }
   }
-  
+
   /**
    * 键盘松开事件处理
    * @param {KeyboardEvent} event - 键盘事件
@@ -81,12 +81,12 @@ export class InputManager {
     if (this.keyMap[event.code]) {
       // 设置输入状态
       this.player.setInput(this.keyMap[event.code], false);
-      
+
       // 阻止默认行为
       event.preventDefault();
     }
   }
-  
+
   /**
    * 鼠标移动事件处理
    * @param {MouseEvent} event - 鼠标事件
@@ -97,7 +97,7 @@ export class InputManager {
       this.player.handleMouseMove(event.movementX, event.movementY);
     }
   }
-  
+
   /**
    * 鼠标按下事件处理
    * @param {MouseEvent} event - 鼠标事件
@@ -105,7 +105,7 @@ export class InputManager {
   onMouseDown(event) {
     // 如果鼠标未锁定，忽略
     if (!this.isLocked) return;
-    
+
     // 左键
     if (event.button === 0) {
       this.player.setMouseButton('left', true);
@@ -113,17 +113,17 @@ export class InputManager {
     // 右键
     else if (event.button === 2) {
       this.player.setMouseButton('right', true);
-      
+
       // 放置方块
       if (this.player.placeBlock) {
         this.player.placeBlock(window.game.chunkManager);
       }
     }
-    
+
     // 阻止默认行为
     event.preventDefault();
   }
-  
+
   /**
    * 鼠标松开事件处理
    * @param {MouseEvent} event - 鼠标事件
@@ -137,11 +137,11 @@ export class InputManager {
     else if (event.button === 2) {
       this.player.setMouseButton('right', false);
     }
-    
+
     // 阻止默认行为
     event.preventDefault();
   }
-  
+
   /**
    * 鼠标滚轮事件处理
    * @param {WheelEvent} event - 滚轮事件
@@ -149,7 +149,7 @@ export class InputManager {
   onWheel(event) {
     // 如果鼠标未锁定，忽略
     if (!this.isLocked) return;
-    
+
     // 向上滚动，选择上一个槽位
     if (event.deltaY < 0) {
       this.player.selectPrevSlot();
@@ -158,18 +158,19 @@ export class InputManager {
     else if (event.deltaY > 0) {
       this.player.selectNextSlot();
     }
-    
+
     // 阻止默认行为
     event.preventDefault();
   }
-  
+
   /**
    * 指针锁定状态变化事件处理
    */
   onPointerLockChange() {
     this.isLocked = document.pointerLockElement === this.domElement;
+    console.log('鼠标锁定状态变化:', this.isLocked ? '已锁定' : '未锁定');
   }
-  
+
   /**
    * 销毁输入管理器
    */
@@ -182,7 +183,7 @@ export class InputManager {
     document.removeEventListener('mouseup', this.onMouseUp);
     document.removeEventListener('wheel', this.onWheel);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
-    
+
     // 解锁鼠标
     if (this.isLocked) {
       document.exitPointerLock();
