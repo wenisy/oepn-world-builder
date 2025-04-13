@@ -1,12 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const SaveManager = require('./saveManager');
 
 /**
  * 世界状态管理类
  */
 class WorldState {
   constructor() {
+    // 初始化存档管理器
+    this.saveManager = new SaveManager();
+
+    // 当前活跃存档ID
+    this.currentSaveId = null;
+
     // 世界数据
     this.data = {
       buildings: [],
@@ -15,80 +22,88 @@ class WorldState {
       nations: [],
       alliances: []
     };
-    
-    // 加载世界状态
-    this.load();
+
+    // 检查是否有存档
+    const saves = this.saveManager.getSaves();
+    if (saves.length === 0) {
+      // 创建默认存档
+      const defaultSave = this.saveManager.createSave('默认世界', '第一个开放世界', {
+        initialEnvironment: 'stoneForest'
+      });
+      this.currentSaveId = defaultSave.id;
+    } else {
+      // 使用最近游玩的存档
+      const lastPlayedSave = saves.sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)[0];
+      this.currentSaveId = lastPlayedSave.id;
+    }
+
+    // 加载当前存档
+    this.loadCurrentSave();
   }
-  
+
   /**
-   * 加载世界状态
+   * 加载当前存档
    */
-  load() {
-    try {
-      // 检查世界数据文件是否存在
-      const dataPath = path.join(__dirname, 'data', 'world.json');
-      
-      if (fs.existsSync(dataPath)) {
-        // 读取世界数据
-        const data = fs.readFileSync(dataPath, 'utf8');
-        this.data = JSON.parse(data);
-        console.log('世界数据加载成功');
-      } else {
-        // 创建初始世界
-        this.createInitialWorld();
-        console.log('创建初始世界');
-      }
-    } catch (error) {
-      console.error('加载世界数据失败:', error);
-      // 创建初始世界
-      this.createInitialWorld();
+  loadCurrentSave() {
+    if (!this.currentSaveId) {
+      console.error('没有当前存档ID');
+      return;
+    }
+
+    // 加载存档数据
+    const worldData = this.saveManager.loadSave(this.currentSaveId);
+
+    if (worldData) {
+      this.data = worldData;
+      console.log(`存档 ${this.currentSaveId} 加载成功`);
+    } else {
+      console.error(`加载存档 ${this.currentSaveId} 失败`);
+      // 创建新存档
+      this.createNewSave('新世界', '自动创建的新世界');
     }
   }
-  
+
   /**
-   * 保存世界状态
+   * 保存当前世界状态
    */
   save() {
-    try {
-      // 确保数据目录存在
-      const dataDir = path.join(__dirname, 'data');
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-      
-      // 保存世界数据
-      const dataPath = path.join(dataDir, 'world.json');
-      fs.writeFileSync(dataPath, JSON.stringify(this.data, null, 2), 'utf8');
-      console.log('世界数据保存成功');
-    } catch (error) {
-      console.error('保存世界数据失败:', error);
+    if (!this.currentSaveId) {
+      console.error('没有当前存档ID');
+      return false;
     }
+
+    // 保存到当前存档
+    const success = this.saveManager.saveWorldData(this.currentSaveId, this.data);
+
+    if (success) {
+      console.log(`存档 ${this.currentSaveId} 保存成功`);
+    } else {
+      console.error(`保存存档 ${this.currentSaveId} 失败`);
+    }
+
+    return success;
   }
-  
+
   /**
-   * 创建初始世界
+   * 创建新存档
+   * @param {string} name - 存档名称
+   * @param {string} description - 存档描述
+   * @param {Object} worldParams - 世界参数
+   * @returns {Object} 新存档
    */
-  createInitialWorld() {
-    // 重置世界数据
-    this.data = {
-      buildings: [],
-      resources: [],
-      terrain: {
-        seed: Math.floor(Math.random() * 1000000),
-        size: 1000,
-        maxHeight: 100
-      },
-      nations: [],
-      alliances: []
-    };
-    
-    // 添加一些初始资源
-    this.createInitialResources();
-    
-    // 保存世界数据
-    this.save();
+  createNewSave(name, description, worldParams = {}) {
+    // 创建新存档
+    const newSave = this.saveManager.createSave(name, description, worldParams);
+
+    // 切换到新存档
+    this.currentSaveId = newSave.id;
+
+    // 加载新存档
+    this.loadCurrentSave();
+
+    return newSave;
   }
-  
+
   /**
    * 创建初始资源
    */
@@ -96,13 +111,13 @@ class WorldState {
     // 添加一些随机资源
     const resourceTypes = ['wood', 'stone', 'iron', 'gold'];
     const resourceCount = 100;
-    
+
     for (let i = 0; i < resourceCount; i++) {
       const type = resourceTypes[Math.floor(Math.random() * resourceTypes.length)];
       const x = Math.random() * this.data.terrain.size - this.data.terrain.size / 2;
       const z = Math.random() * this.data.terrain.size - this.data.terrain.size / 2;
       const y = 0; // 假设在地面上
-      
+
       this.data.resources.push({
         id: uuidv4(),
         type,
@@ -111,7 +126,7 @@ class WorldState {
       });
     }
   }
-  
+
   /**
    * 获取世界状态
    * @returns {Object} 世界状态
@@ -123,7 +138,7 @@ class WorldState {
       resources: this.data.resources
     };
   }
-  
+
   /**
    * 检查是否可以在指定位置建造
    * @param {Object} position - 位置
@@ -137,18 +152,18 @@ class WorldState {
         Math.pow(building.position.x - position.x, 2) +
         Math.pow(building.position.z - position.z, 2)
       );
-      
+
       // 如果距离小于5，认为重叠
       if (distance < 5) {
         return false;
       }
     }
-    
+
     // TODO: 检查地形是否适合建造
-    
+
     return true;
   }
-  
+
   /**
    * 创建建筑
    * @param {string} type - 建筑类型
@@ -168,13 +183,13 @@ class WorldState {
       health: 100,
       createdAt: Date.now()
     };
-    
+
     // 添加到建筑列表
     this.data.buildings.push(building);
-    
+
     return building;
   }
-  
+
   /**
    * 检查是否可以销毁建筑
    * @param {string} buildingId - 建筑ID
@@ -184,16 +199,16 @@ class WorldState {
   canDestroyBuilding(buildingId, playerId) {
     // 查找建筑
     const building = this.data.buildings.find(b => b.id === buildingId);
-    
+
     // 如果建筑不存在，返回false
     if (!building) {
       return false;
     }
-    
+
     // 检查是否是建筑所有者
     return building.ownerId === playerId;
   }
-  
+
   /**
    * 销毁建筑
    * @param {string} buildingId - 建筑ID
@@ -202,18 +217,18 @@ class WorldState {
   destroyBuilding(buildingId) {
     // 查找建筑索引
     const index = this.data.buildings.findIndex(b => b.id === buildingId);
-    
+
     // 如果建筑不存在，返回null
     if (index === -1) {
       return null;
     }
-    
+
     // 移除建筑
     const building = this.data.buildings.splice(index, 1)[0];
-    
+
     return building;
   }
-  
+
   /**
    * 创建国家
    * @param {string} name - 国家名称
@@ -238,13 +253,13 @@ class WorldState {
         gold: 0
       }
     };
-    
+
     // 添加到国家列表
     this.data.nations.push(nation);
-    
+
     return nation;
   }
-  
+
   /**
    * 创建联盟
    * @param {string} name - 联盟名称
@@ -262,10 +277,10 @@ class WorldState {
       nations: [],
       createdAt: Date.now()
     };
-    
+
     // 添加到联盟列表
     this.data.alliances.push(alliance);
-    
+
     return alliance;
   }
 }

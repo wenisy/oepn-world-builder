@@ -7,6 +7,45 @@ const initWorld = () => ({ update: () => {} });
 const initUI = () => ({ update: () => {} });
 const initNetworkClient = () => ({ sendPlayerUpdate: () => {} });
 
+// 导入存档菜单
+// 在实际项目中，这将从模块导入
+const createSaveMenu = () => ({
+  show: () => {
+    // 创建存档菜单元素
+    const saveMenu = document.createElement('div');
+    saveMenu.className = 'save-menu';
+    saveMenu.innerHTML = `
+      <h2>选择世界</h2>
+      <div class="save-list">
+        <div class="save-item selected" data-id="default">
+          <div class="save-info">
+            <h3>默认世界</h3>
+            <p>一个神秘的石林世界，等待探索。</p>
+            <span class="save-date">最后游玩: ${new Date().toLocaleString()}</span>
+          </div>
+          <button class="delete-button">删除</button>
+        </div>
+      </div>
+      <div class="button-container">
+        <button class="button">创建新世界</button>
+        <button class="button primary">进入游戏</button>
+      </div>
+    `;
+
+    // 添加到文档
+    document.body.appendChild(saveMenu);
+
+    // 添加事件监听器
+    const enterButton = saveMenu.querySelector('.button.primary');
+    enterButton.addEventListener('click', () => {
+      saveMenu.remove();
+      document.getElementById('loading-screen').style.display = 'flex';
+      initGame();
+    });
+  },
+  hide: () => {}
+});
+
 // 游戏状态
 const gameState = {
   isLoading: true,
@@ -27,6 +66,7 @@ const gameState = {
     graphics: 'medium',
     sound: 0.7,
     music: 0.5,
+    pixelSize: 4,
     controls: {
       forward: 'w',
       backward: 's',
@@ -35,6 +75,10 @@ const gameState = {
       jump: ' ',
       build: 'b'
     }
+  },
+  saves: {
+    currentSaveId: null,
+    list: []
   }
 };
 
@@ -45,6 +89,7 @@ let physicsSystem;
 let worldSystem;
 let uiSystem;
 let networkClient;
+let saveMenu;
 
 // 初始化游戏
 async function initGame() {
@@ -76,22 +121,35 @@ async function initGame() {
     updateLoadingProgress(80, '连接到服务器...');
     networkClient = await initNetworkClient(gameState);
 
+    // 初始化存档菜单
+    updateLoadingProgress(90, '加载存档...');
+    saveMenu = createSaveMenu();
+
     // 完成加载
     updateLoadingProgress(100, '加载完成!');
 
-    // 隐藏加载屏幕，显示游戏UI
+    // 隐藏加载屏幕，显示存档菜单
     setTimeout(() => {
       document.getElementById('loading-screen').style.display = 'none';
-      document.getElementById('ui-overlay').classList.remove('hidden');
-      gameState.isLoading = false;
-
-      // 开始游戏循环
-      gameLoop();
+      saveMenu.show();
     }, 1000);
   } catch (error) {
     console.error('游戏初始化失败:', error);
     updateLoadingProgress(0, '初始化失败，请刷新页面重试');
   }
+}
+
+// 开始游戏
+function startGame() {
+  // 隐藏存档菜单
+  saveMenu.hide();
+
+  // 显示游戏UI
+  document.getElementById('ui-overlay').classList.remove('hidden');
+  gameState.isLoading = false;
+
+  // 开始游戏循环
+  gameLoop();
 }
 
 // 更新加载进度
@@ -134,6 +192,13 @@ function gameLoop() {
 
 // 当页面加载完成后初始化游戏
 window.addEventListener('load', initGame);
+
+// 添加像素大小调整事件
+document.getElementById('pixel-size')?.addEventListener('input', function(e) {
+  if (renderer && renderer.pixelPass) {
+    renderer.pixelPass.uniforms['pixelSize'].value = parseInt(e.target.value);
+  }
+});
 
 // 处理窗口大小变化
 window.addEventListener('resize', () => {
